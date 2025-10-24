@@ -5,6 +5,7 @@ const initialState = {
     profile: null,
     rides: [],
     rideRequest: null,
+    currentRide: null,
     isLoading: false,
     isError: false,
     message: '',
@@ -22,6 +23,15 @@ export const getMyProfile = createAsyncThunk('riders/getMyProfile', async (_, th
 export const getMyRides = createAsyncThunk('riders/getMyRides', async (pageRequest, thunkAPI) => {
     try {
         return await RiderService.getAllMyRides(pageRequest);
+    } catch (error) {
+        const message = (error.response?.data?.message) || error.message || error.toString();
+        return thunkAPI.rejectWithValue(message);
+    }
+});
+
+export const getRideDetails = createAsyncThunk('riders/getRideDetails', async (rideId, thunkAPI) => {
+    try {
+        return await RiderService.getRideDetails(rideId);
     } catch (error) {
         const message = (error.response?.data?.message) || error.message || error.toString();
         return thunkAPI.rejectWithValue(message);
@@ -46,18 +56,28 @@ export const rateDriver = createAsyncThunk('riders/rateDriver', async (ratingDat
     }
 });
 
-
 export const RiderSlice = createSlice({
     name: 'rider',
     initialState,
     reducers: {
-        reset: (state) => initialState,
+        reset: (state) => {
+            Object.assign(state, initialState);
+        },
+        // Optional: Clear current ride manually
+        clearCurrentRide: (state) => {
+            state.currentRide = null;
+        },
     },
     extraReducers: (builder) => {
         builder
-            .addCase(getMyProfile.pending, (state) => { state.isLoading = true; })
+            // Get My Profile
+            .addCase(getMyProfile.pending, (state) => { 
+                state.isLoading = true; 
+            })
             .addCase(getMyProfile.fulfilled, (state, action) => {
                 state.isLoading = false;
+                state.isError = false;
+                state.message = '';
                 state.profile = action.payload.data;
             })
             .addCase(getMyProfile.rejected, (state, action) => {
@@ -65,9 +85,15 @@ export const RiderSlice = createSlice({
                 state.isError = true;
                 state.message = action.payload;
             })
-            .addCase(getMyRides.pending, (state) => { state.isLoading = true; })
+            
+            // Get My Rides (History)
+            .addCase(getMyRides.pending, (state) => { 
+                state.isLoading = true; 
+            })
             .addCase(getMyRides.fulfilled, (state, action) => {
                 state.isLoading = false;
+                state.isError = false;
+                state.message = '';
                 state.rides = action.payload.content;
             })
             .addCase(getMyRides.rejected, (state, action) => {
@@ -75,20 +101,61 @@ export const RiderSlice = createSlice({
                 state.isError = true;
                 state.message = action.payload;
             })
-            .addCase(cancelRide.pending, (state) => { state.isLoading = true; })
+            
+            // Get Ride Details (Current/Active Ride)
+            .addCase(getRideDetails.pending, (state) => { 
+                state.isLoading = true; 
+            })
+            .addCase(getRideDetails.fulfilled, (state, action) => {
+                state.isLoading = false;
+                state.isError = false;
+                state.message = '';
+                state.currentRide = action.payload.data || action.payload;
+            })
+            .addCase(getRideDetails.rejected, (state, action) => {
+                state.isLoading = false;
+                state.isError = true;
+                state.message = action.payload;
+            })
+            
+            // Cancel Ride (Cancel Current/Active Ride)
+            .addCase(cancelRide.pending, (state) => {
+                state.isLoading = true;
+            })
             .addCase(cancelRide.fulfilled, (state, action) => {
                 state.isLoading = false;
-                state.rides = state.rides.map((ride) =>
-                    ride.id === action.payload.id ? action.payload : ride
-                );
+                state.isError = false;
+                state.message = '';
+                
+                const cancelledRide = action.payload.data || action.payload;
+                
+                if (state.currentRide?.id === cancelledRide.id) {
+                    state.currentRide = cancelledRide;
+                }
+                const rideIndex = state.rides.findIndex(r => r.id === cancelledRide.id);
+                if (rideIndex !== -1) {
+                    state.rides[rideIndex] = cancelledRide;
+                }
             })
             .addCase(cancelRide.rejected, (state, action) => {
                 state.isLoading = false;
                 state.isError = true;
                 state.message = action.payload;
             })
-            .addCase(rateDriver.pending, (state) => { state.isLoading = true; })
-            .addCase(rateDriver.fulfilled, (state) => { state.isLoading = false; })
+            
+            // Rate Driver
+            .addCase(rateDriver.pending, (state) => { 
+                state.isLoading = true; 
+            })
+            .addCase(rateDriver.fulfilled, (state, action) => { 
+                state.isLoading = false;
+                state.isError = false;
+                state.message = '';
+                const ratedRide = action.payload.data || action.payload;
+                if (state.currentRide?.id === ratedRide.id) {
+                    state.currentRide = ratedRide;
+                }
+            })
             .addCase(rateDriver.rejected, (state, action) => {
                 state.isLoading = false;
                 state.isError = true;
@@ -97,5 +164,5 @@ export const RiderSlice = createSlice({
     },
 });
 
-export const { reset } = RiderSlice.actions;
+export const { reset, clearCurrentRide } = RiderSlice.actions;
 export default RiderSlice.reducer;

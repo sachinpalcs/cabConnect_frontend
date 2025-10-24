@@ -1,11 +1,34 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import DriverService from '../service/DriverService';
 
+
+const loadActiveRideFromStorage = () => {
+    try {
+        const serializedRide = localStorage.getItem('activeRide');
+        if (serializedRide === null) {
+            return null;
+        }
+        const ride = JSON.parse(serializedRide);
+        
+        // If the ride was somehow left in a "finished" state, ignore it
+        const completedStatuses = ['ENDED', 'COMPLETED', 'CANCELLED'];
+        if (completedStatuses.includes(ride.rideStatues)) {
+            localStorage.removeItem('activeRide');
+            return null;
+        }
+        
+        return ride;
+    } catch (err) {
+        console.error("Could not load active ride from storage", err);
+        return null;
+    }
+};
+
 const initialState = {
     profile: null,
     rides: [],
     pendingRequests: [],
-    activeRide: null,
+    activeRide: loadActiveRideFromStorage(),
     isLoading: false,
     isError: false,
     message: '',
@@ -104,7 +127,13 @@ export const DriverSlice = createSlice({
     name: 'drivers',
     initialState,
     reducers: {
-        reset: (state) => initialState,
+        reset: (state) => {
+            localStorage.removeItem('activeRide');
+            return {
+                ...initialState,
+                activeRide: null,
+            };
+        }
     },
     extraReducers: (builder) => {
         builder
@@ -140,19 +169,21 @@ export const DriverSlice = createSlice({
             .addCase(acceptRide.fulfilled, (state, action) => {
                 state.isLoading = false;
                 state.activeRide = action.payload.data;
+                localStorage.setItem('activeRide', JSON.stringify(action.payload.data));
             })
             .addCase(acceptRide.rejected, (state, action) => {
                 state.isLoading = false;
                 state.isError = true;
                 state.message = action.payload;
             })
-            // NEW: Start Ride Reducers
+            // Start Ride Reducers
             .addCase(startRide.pending, (state) => {
                 state.isLoading = true;
             })
             .addCase(startRide.fulfilled, (state, action) => {
                 state.isLoading = false;
                 state.activeRide = action.payload.data;
+                localStorage.setItem('activeRide', JSON.stringify(action.payload.data));
             })
             .addCase(startRide.rejected, (state, action) => {
                 state.isLoading = false;
@@ -164,7 +195,8 @@ export const DriverSlice = createSlice({
             })
             .addCase(endRide.fulfilled, (state, action) => {
                 state.isLoading = false;
-                state.activeRide = null; // Ride is over, so clear the active ride
+                state.activeRide = null;
+                localStorage.removeItem('activeRide');
             })
             .addCase(endRide.rejected, (state, action) => {
                 state.isLoading = false;
@@ -178,6 +210,7 @@ export const DriverSlice = createSlice({
             .addCase(cancelRide.fulfilled, (state) => {
                 state.isLoading = false;
                 state.activeRide = null;
+                localStorage.removeItem('activeRide');
             })
             .addCase(cancelRide.rejected, (state, action) => {
                 state.isLoading = false;

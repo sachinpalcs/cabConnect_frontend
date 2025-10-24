@@ -27,6 +27,13 @@ const rateDriver = async (ratingDto) => {
     return response.data;
 };
 
+
+// get ride details by id
+const getRideDetails = async (rideId) => {
+    const response = await api.get(API_URL + `getRideDetails/${rideId}`);
+    return response.data;
+};
+
 // Get rider's own profile
 const getMyProfile = async () => {
     const response = await api.get(API_URL + 'getMyProfile');
