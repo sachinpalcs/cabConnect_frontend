@@ -61,9 +61,12 @@ export const RiderSlice = createSlice({
     initialState,
     reducers: {
         reset: (state) => {
-            Object.assign(state, initialState);
+            state.rideRequest = null;
+            state.currentRide = null;
+            state.isLoading = false;
+            state.isError = false;
+            state.message = '';
         },
-        // Optional: Clear current ride manually
         clearCurrentRide: (state) => {
             state.currentRide = null;
         },
@@ -94,7 +97,7 @@ export const RiderSlice = createSlice({
                 state.isLoading = false;
                 state.isError = false;
                 state.message = '';
-                state.rides = action.payload.content;
+                state.rides = action.payload.data;
             })
             .addCase(getMyRides.rejected, (state, action) => {
                 state.isLoading = false;
@@ -110,7 +113,7 @@ export const RiderSlice = createSlice({
                 state.isLoading = false;
                 state.isError = false;
                 state.message = '';
-                state.currentRide = action.payload.data || action.payload;
+                state.currentRide = action.payload.data;
             })
             .addCase(getRideDetails.rejected, (state, action) => {
                 state.isLoading = false;
@@ -132,9 +135,12 @@ export const RiderSlice = createSlice({
                 if (state.currentRide?.id === cancelledRide.id) {
                     state.currentRide = cancelledRide;
                 }
-                const rideIndex = state.rides.findIndex(r => r.id === cancelledRide.id);
-                if (rideIndex !== -1) {
-                    state.rides[rideIndex] = cancelledRide;
+
+                if (state.rides && state.rides.content) {
+                    const rideIndex = state.rides.content.findIndex(r => r.id === cancelledRide.id);
+                    if (rideIndex !== -1) {
+                        state.rides.content[rideIndex] = cancelledRide;
+                    }
                 }
             })
             .addCase(cancelRide.rejected, (state, action) => {

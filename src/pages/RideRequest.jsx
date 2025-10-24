@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, use } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { requestRide, reset, cancelRideRequest } from '../redux/RideRequestSlice';
@@ -15,19 +15,53 @@ const RideRequest = () => {
 
     const dispatch = useDispatch();
     const { isLoading, isSuccess, isError, message, rideRequest } = useSelector((state) => state.rideRequest);
+    const rideRequestId = rideRequest?.id;
 
     useEffect(() => {
         if (isError) {
             alert(message || 'Failed to request ride.');
             dispatch(reset());
+            if (!isSuccess && !rideRequest) {
+                dispatch(reset());
+            } else {
+                dispatch(clearError());
+            }
         }
     }, [isError, message, dispatch]);
+
+    useEffect(() => {
+        let autoCancelTimeout = null;
+        if (isSuccess && rideRequestId) {
+            autoCancelTimeout = setTimeout(() => {
+                if(rideRequest?.id === rideRequestId) {
+                    alert("We could not find a driver in time. Your request has been automatically cancelled.");
+                    dispatch(cancelRideRequest(rideRequest.id));
+                }
+            }, 120000);
+        }
+        return () => {
+            if(autoCancelTimeout) {
+                clearTimeout(autoCancelTimeout);
+            }
+        };
+    }, [isSuccess, rideRequestId, dispatch, rideRequest]);
+
+    useEffect(() => {
+        if(!isSuccess && !rideRequest) {
+          setPickUpLocation(null);
+          setDropOffLocation(null);
+          setPaymentMethod('CASH');
+          setIsSettingPickup(true);
+        }
+    }, [isSuccess, rideRequest]);
+
+
 
     const handleMapClick = (latlng) => {
         if (isSettingPickup) {
             setPickUpLocation(latlng);
         } else {
-            setDropOffLocation(latlng);
+        setDropOffLocation(latlng);
         }
     };
 
@@ -57,10 +91,6 @@ const RideRequest = () => {
     const handleCancelRequest = () => {
         if (rideRequest && rideRequest.id) {
             dispatch(cancelRideRequest(rideRequest.id));
-            setPickUpLocation(null);
-            setDropOffLocation(null);
-            setPaymentMethod('CASH');
-            setIsSettingPickup(true);
         } else {
             alert("Could not find ride ID to cancel.");
             dispatch(reset());
@@ -83,7 +113,6 @@ const RideRequest = () => {
                                 <p className="text-md text-gray-600">
                                     Status: <span className="font-semibold text-yellow-800 bg-yellow-100 px-2 py-1 rounded-full">{rideRequest?.rideRequestStatues}</span>
                                 </p>
-                                {/* <p className="text-sm text-gray-500 pt-2">Request ID: {rideRequest.id}</p> */}
                             </div>
                             <button onClick={handleCancelRequest}
                                 disabled={isLoading}

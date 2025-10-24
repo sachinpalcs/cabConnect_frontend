@@ -10,7 +10,6 @@ const loadActiveRideFromStorage = () => {
         }
         const ride = JSON.parse(serializedRide);
         
-        // If the ride was somehow left in a "finished" state, ignore it
         const completedStatuses = ['ENDED', 'COMPLETED', 'CANCELLED'];
         if (completedStatuses.includes(ride.rideStatues)) {
             localStorage.removeItem('activeRide');

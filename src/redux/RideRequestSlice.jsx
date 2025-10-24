@@ -1,10 +1,26 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import RiderService from '../service/RiderService';
 
+const RIDE_STORAGE_KEY = 'activeRideRequest';
+
+const getRideFromStorage = () => {
+    try {
+    const storedRide = localStorage.getItem(RIDE_STORAGE_KEY);
+        if (storedRide) {
+            return JSON.parse(storedRide);
+        }
+    } catch (error) {
+    console.error("Failed to parse ride from localStorage", error);
+    localStorage.removeItem(RIDE_STORAGE_KEY); // Clear bad data
+    }
+    return null;
+};
+const storedRideRequest = getRideFromStorage();
+
 const initialState = {
-    rideRequest: null,
+    rideRequest: storedRideRequest,
     isLoading: false,
-    isSuccess: false,
+    isSuccess: !!storedRideRequest,
     isError: false,
     message: '',
 };
@@ -44,7 +60,12 @@ export const RideRequestSlice = createSlice({
             state.isError = false;
             state.message = '';
             state.rideRequest = null;
+            localStorage.removeItem(RIDE_STORAGE_KEY);
         },
+        clearError: (state) => {
+            state.isError = false;
+            state.message = '';
+        }
     },
     extraReducers: (builder) => {
         builder
@@ -55,6 +76,11 @@ export const RideRequestSlice = createSlice({
                 state.isLoading = false;
                 state.isSuccess = true;
                 state.rideRequest = action.payload.data;
+                try {
+                     localStorage.setItem(RIDE_STORAGE_KEY, JSON.stringify(action.payload.data));
+                } catch (error) {
+                    console.error("Failed to save ride to localStorage", error);
+                }
             })
             .addCase(requestRide.rejected, (state, action) => {
                 state.isLoading = false;
@@ -70,6 +96,7 @@ export const RideRequestSlice = createSlice({
                 state.isSuccess = true;
                 state.rideRequest = null;
                 state.message = action.payload.message || 'Ride cancelled successfully';
+                localStorage.removeItem(RIDE_STORAGE_KEY);
             })
             .addCase(cancelRideRequest.rejected, (state, action) => {
                 state.isLoading = false;

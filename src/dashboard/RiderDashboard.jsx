@@ -1,7 +1,21 @@
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
+import GeoLocationName from '../component/map/GeoLocationName';
 import { getMyProfile, getMyRides, getRideDetails, cancelRide, rateDriver, reset } from '../redux/RiderSlice';
+
+const formatDateTime = (dateTimeString) => {
+    if (!dateTimeString) return 'N/A';
+    try {
+        return new Intl.DateTimeFormat('en-US', {
+            year: 'numeric', month: 'short', day: 'numeric',
+            hour: 'numeric', minute: '2-digit', hour12: true
+        }).format(new Date(dateTimeString));
+    } catch (e) {
+        return 'Invalid Date';
+    }
+};
+
 
 const RiderDashboard = () => {
     const navigate = useNavigate();
@@ -9,8 +23,12 @@ const RiderDashboard = () => {
     const { profile, rides, currentRide, isLoading, isError, message } = useSelector((state) => state.rider);
     
     const [ratingRideId, setRatingRideId] = useState(null);
-    const [currentRating, setCurrentRating] = useState(5);
-    const [activeTab, setActiveTab] = useState('profile'); // profile, currentRide, history
+    const [ratings, setRatings] = useState({});
+    const [activeTab, setActiveTab] = useState('profile');
+
+    const rideHistory = rides?.content || [];
+    const currentRideDetails = currentRide;
+
 
     useEffect(() => {
         if (isError && message) {
@@ -22,33 +40,64 @@ const RiderDashboard = () => {
     useEffect(() => {
         dispatch(getMyProfile());
         dispatch(getMyRides()); 
-        // You can check if there's an active ride and fetch it
-        // dispatch(getRideDetails(rideId)); 
     }, [dispatch]);
+
+    useEffect(() => {
+        if (rideHistory.length > 0 && !currentRideDetails) {
+            const activeRide = 
+                rideHistory.find(ride => ride.rideStatues === 'ONGOING') ||
+                rideHistory.find(ride => ride.rideStatues === 'CONFIRMED');
+
+            if (activeRide) {
+                dispatch(getRideDetails(activeRide.id));
+                setActiveTab('currentRide');
+            }
+        }
+    }, [rideHistory, currentRideDetails, dispatch]);
+
+
 
     const handleCancelRide = (rideId) => {
         if (window.confirm('Are you sure you want to cancel this ride?')) {
-            dispatch(cancelRide(rideId));
+            dispatch(cancelRide(rideId)).then((result) => {
+                if (!result.error) {
+                    alert('Ride cancelled successfully!');
+                    dispatch(getMyRides());
+                    dispatch(getRideDetails(activeRide.id));
+                }
+            });
         }
     };
 
-    const handleRateDriver = (rideId) => {
-        const ratingDto = { rideId, rating: currentRating };
+    const handleRatingChange = (rideId, value) => {
+        setRatings(prev => ({
+            ...prev,
+            [rideId]: value
+        }));
+    };
+
+    const handleRateSubmit = (rideId) => {
+        const rating = Number(ratings[rideId]);
+        if (!rating || rating < 1 || rating > 5) {
+            alert('Please enter a valid rating between 1 and 5');
+            return;
+        }
+        const ratingDto = { rideId, rating };
         dispatch(rateDriver(ratingDto)).then((result) => {
             if (!result.error) {
                 alert('Driver rated successfully!');
-                setRatingRideId(null);
+                setRatings(prev => {
+                    const newRatings = { ...prev };
+                    delete newRatings[rideId];
+                    return newRatings;
+                });
+                dispatch(getMyRides());
             }
         });
     };
 
-    const handleViewRideDetails = (rideId) => {
-        dispatch(getRideDetails(rideId));
-        setActiveTab('currentRide');
-    };
 
-    // Show a loading indicator only on the initial data fetch
-    if (isLoading && !profile && rides.length === 0) {
+    if (isLoading && !profile && rideHistory.length === 0) {
         return <div className="text-center p-10 text-xl font-semibold">Loading your dashboard...</div>;
     }
 
@@ -106,44 +155,45 @@ const RiderDashboard = () => {
 
                 {/* Content Sections */}
                 <div className="bg-white p-6 rounded-lg shadow-md">
-                    {/* PROFILE SECTION */}
-                    {activeTab === 'profile' && profile && (
+                    {activeTab === 'profile' && (
                         <div>
                             <h2 className="text-2xl font-bold text-gray-800 mb-6">Your Profile</h2>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                {/* Name */}
-                                <div className="bg-gray-50 p-4 rounded-lg">
-                                    <span className="text-sm font-semibold text-gray-600">Name</span>
-                                    <p className="text-lg text-gray-800 mt-1">{profile.user.name}</p>
-                                </div>
-                                
-                                {/* Email */}
-                                <div className="bg-gray-50 p-4 rounded-lg">
-                                    <span className="text-sm font-semibold text-gray-600">Email</span>
-                                    <p className="text-lg text-gray-800 mt-1">{profile.user.email}</p>
-                                </div>
-                                
-                                {/* Rating */}
-                                <div className="bg-gray-50 p-4 rounded-lg">
-                                    <span className="text-sm font-semibold text-gray-600">Rating</span>
-                                    <div className="flex items-center gap-2 mt-1">
-                                        <span className="text-yellow-500 text-2xl">★</span>
-                                        <span className="text-lg font-semibold text-gray-800">
-                                            {profile.rating ? profile.rating.toFixed(2) : '0.00'}
-                                        </span>
+                            {profile ? (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="bg-gray-50 p-4 rounded-lg">
+                                        <span className="text-sm font-semibold text-gray-600">Name</span>
+                                        <p className="text-lg text-gray-800 mt-1">{profile.user?.name || profile.name || 'N/A'}</p>
+                                    </div>
+                                    
+                                    <div className="bg-gray-50 p-4 rounded-lg">
+                                        <span className="text-sm font-semibold text-gray-600">Email</span>
+                                        <p className="text-lg text-gray-800 mt-1">{profile.user?.email || profile.email || 'N/A'}</p>
+                                    </div>
+                                    
+                                    <div className="bg-gray-50 p-4 rounded-lg">
+                                        <span className="text-sm font-semibold text-gray-600">Rating</span>
+                                        <div className="flex items-center gap-2 mt-1">
+                                            <span className="text-yellow-500 text-2xl">★</span>
+                                            <span className="text-lg font-semibold text-gray-800">
+                                                {profile.rating ? profile.rating.toFixed(2) : '0.00'}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="bg-gray-50 p-4 rounded-lg">
+                                        <span className="text-sm font-semibold text-gray-600">Role</span>
+                                        <p className="text-lg text-gray-800 mt-1">
+                                            {profile.user?.roles && profile.user.roles.length > 0 
+                                                ? profile.user.roles.join(', ') 
+                                                : profile.roles && profile.roles.length > 0
+                                                ? profile.roles.join(', ')
+                                                : 'N/A'}
+                                        </p>
                                     </div>
                                 </div>
-                                
-                                {/* Role */}
-                                <div className="bg-gray-50 p-4 rounded-lg">
-                                    <span className="text-sm font-semibold text-gray-600">Role</span>
-                                    <p className="text-lg text-gray-800 mt-1">
-                                        {profile.user.roles && profile.user.roles.length > 0 
-                                            ? profile.user.roles.join(', ') 
-                                            : 'N/A'}
-                                    </p>
-                                </div>
-                            </div>
+                            ) : (
+                                <p className="text-gray-500 text-center py-8">Loading profile...</p>
+                            )}
                         </div>
                     )}
 
@@ -151,25 +201,25 @@ const RiderDashboard = () => {
                     {activeTab === 'currentRide' && (
                         <div>
                             <h2 className="text-2xl font-bold text-gray-800 mb-6">Current Ride Details</h2>
-                            {currentRide ? (
+                            {currentRideDetails ? (
                                 <div className="space-y-6">
                                     {/* Ride Status Banner */}
                                     <div className={`p-4 rounded-lg ${
-                                        currentRide.rideStatues === 'CONFIRMED' ? 'bg-blue-50 border border-blue-200' :
-                                        currentRide.rideStatues === 'ONGOING' ? 'bg-green-50 border border-green-200' :
-                                        currentRide.rideStatues === 'ENDED' ? 'bg-gray-50 border border-gray-200' :
-                                        currentRide.rideStatues === 'CANCELLED' ? 'bg-red-50 border border-red-200' :
+                                        currentRideDetails.rideStatues === 'CONFIRMED' ? 'bg-blue-50 border border-blue-200' :
+                                        currentRideDetails.rideStatues === 'ONGOING' ? 'bg-green-50 border border-green-200' :
+                                        currentRideDetails.rideStatues === 'ENDED' ? 'bg-gray-50 border border-gray-200' :
+                                        currentRideDetails.rideStatues === 'CANCELLED' ? 'bg-red-50 border border-red-200' :
                                         'bg-yellow-50 border border-yellow-200'
                                     }`}>
                                         <div className="flex justify-between items-center">
                                             <span className="text-sm font-semibold text-gray-600">Status</span>
                                             <span className={`px-3 py-1 text-sm font-bold rounded-full ${
-                                                currentRide.rideStatues === 'ENDED' ? 'bg-green-100 text-green-800' : 
-                                                currentRide.rideStatues === 'CANCELLED' ? 'bg-red-100 text-red-800' : 
-                                                currentRide.rideStatues === 'ONGOING' ? 'bg-blue-100 text-blue-800' :
+                                                currentRideDetails.rideStatues === 'ENDED' ? 'bg-green-100 text-green-800' : 
+                                                currentRideDetails.rideStatues === 'CANCELLED' ? 'bg-red-100 text-red-800' : 
+                                                currentRideDetails.rideStatues === 'ONGOING' ? 'bg-blue-100 text-blue-800' :
                                                 'bg-yellow-100 text-yellow-800'
                                             }`}>
-                                                {currentRide.rideStatues}
+                                                {currentRideDetails.rideStatues}
                                             </span>
                                         </div>
                                     </div>
@@ -180,12 +230,12 @@ const RiderDashboard = () => {
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             <div>
                                                 <span className="text-sm font-semibold text-gray-600">Name</span>
-                                                <p className="text-lg text-gray-800 mt-1">{currentRide?.driver?.user?.name || 'N/A'}</p>
+                                                <p className="text-lg text-gray-800 mt-1">{currentRideDetails?.driver?.user?.name || 'N/A'}</p>
                                             </div>
                                             <div>
-                                                <span className="text-sm font-semibold text-gray-600">Vehicle</span>
+                                                <span className="text-sm font-semibold text-gray-600">Vehicle ID</span>
                                                 <p className="text-lg text-gray-800 mt-1">
-                                                    {currentRide?.driver?.vehicleModel || 'N/A'} - {currentRide?.driver?.vehiclePlate || 'N/A'}
+                                                    {currentRideDetails?.driver?.vehicleId || 'N/A'}
                                                 </p>
                                             </div>
                                         </div>
@@ -195,76 +245,55 @@ const RiderDashboard = () => {
                                     <div className="bg-gray-50 p-6 rounded-lg">
                                         <h3 className="text-lg font-semibold text-gray-800 mb-4">Ride Details</h3>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <div>
+                                            <div className="md:col-span-2">
                                                 <span className="text-sm font-semibold text-gray-600">Pickup Location</span>
-                                                <p className="text-base text-gray-800 mt-1">{currentRide?.pickupLocation || 'N/A'}</p>
+                                                <p className="text-base text-gray-800 mt-1">
+                                                    {currentRideDetails?.pickUpLocation?.coordinates ? 
+                                                        <GeoLocationName 
+                                                            lat={currentRideDetails.pickUpLocation.coordinates[1]} 
+                                                            lng={currentRideDetails.pickUpLocation.coordinates[0]} 
+                                                        /> : 'N/A'}
+                                                </p>
                                             </div>
-                                            <div>
-                                                <span className="text-sm font-semibold text-gray-600">Destination</span>
-                                                <p className="text-base text-gray-800 mt-1">{currentRide?.destination || 'N/A'}</p>
+                                            <div className="md:col-span-2">
+                                                <span className="text-sm font-semibold text-gray-600">Drop-off Location</span>
+                                                <p className="text-base text-gray-800 mt-1">
+                                                    {currentRideDetails?.dropOffLocation?.coordinates ? 
+                                                        <GeoLocationName 
+                                                            lat={currentRideDetails.dropOffLocation.coordinates[1]} 
+                                                            lng={currentRideDetails.dropOffLocation.coordinates[0]} 
+                                                        /> : 'N/A'}
+                                                </p>
                                             </div>
                                             <div>
                                                 <span className="text-sm font-semibold text-gray-600">Fare</span>
-                                                <p className="text-xl font-bold text-gray-800 mt-1">${currentRide?.fare?.toFixed(2) || '0.00'}</p>
+                                                <p className="text-xl font-bold text-gray-800 mt-1">₹{currentRideDetails?.fare?.toFixed(2) || '0.00'}</p>
                                             </div>
                                             <div>
-                                                <span className="text-sm font-semibold text-gray-600">Requested On</span>
-                                                <p className="text-base text-gray-800 mt-1">
-                                                    {new Date(currentRide.createdTime).toLocaleString()}
-                                                </p>
+                                                <span className="text-sm font-semibold text-gray-600">Payment Method</span>
+                                                <p className="text-base text-gray-800 mt-1">{currentRideDetails?.paymentMethod || 'N/A'}</p>
+                                            </div>
+                                            <div>
+                                                <span className="text-sm font-semibold text-gray-600">Created Time</span>
+                                                <p className="text-base text-gray-800 mt-1">{formatDateTime(currentRideDetails.createdTime)}</p>
+                                            </div>
+                                            <div>
+                                                <span className="text-sm font-semibold text-gray-600">Started At</span>
+                                                <p className="text-base text-gray-800 mt-1">{formatDateTime(currentRideDetails.startedAt)}</p>
                                             </div>
                                         </div>
                                     </div>
 
                                     {/* Action Buttons */}
-                                    <div className="flex gap-4">
-                                        {currentRide.rideStatues === 'CONFIRMED' && (
+                                    {currentRideDetails.rideStatues === 'CONFIRMED' && (
+                                        <div className="flex gap-4">
                                             <button 
-                                                onClick={() => handleCancelRide(currentRide.id)} 
+                                                onClick={() => handleCancelRide(currentRideDetails.id)} 
                                                 disabled={isLoading}
-                                                className="bg-red-500 text-white py-3 px-6 rounded-lg hover:bg-red-600 disabled:bg-red-300 font-semibold"
+                                                className="bg-red-500 text-white py-3 px-6 rounded-lg hover:bg-red-600 disabled:bg-red-300 font-semibold transition"
                                             >
-                                                Cancel Ride
+                                                {isLoading ? 'Cancelling...' : 'Cancel Ride'}
                                             </button>
-                                        )}
-                                        {currentRide.rideStatues === 'ENDED' && (
-                                            <button 
-                                                onClick={() => setRatingRideId(currentRide.id)}
-                                                className="bg-blue-500 text-white py-3 px-6 rounded-lg hover:bg-blue-600 font-semibold"
-                                            >
-                                                Rate Driver
-                                            </button>
-                                        )}
-                                    </div>
-
-                                    {/* Rating Form */}
-                                    {ratingRideId === currentRide.id && (
-                                        <div className="mt-4 p-6 bg-gray-50 rounded-lg border border-gray-200">
-                                            <h4 className="text-lg font-semibold mb-4">Rate your driver</h4>
-                                            <div className="flex items-center gap-4">
-                                                <select 
-                                                    value={currentRating} 
-                                                    onChange={(e) => setCurrentRating(Number(e.target.value))} 
-                                                    className="border-gray-300 rounded-md py-2 px-4"
-                                                >
-                                                    {[5,4,3,2,1].map(num => (
-                                                        <option key={num} value={num}>{num} Star{num > 1 && 's'}</option>
-                                                    ))}
-                                                </select>
-                                                <button 
-                                                    onClick={() => handleRateDriver(currentRide.id)} 
-                                                    disabled={isLoading}
-                                                    className="bg-green-500 text-white py-2 px-6 rounded-md hover:bg-green-600 disabled:bg-green-300 font-semibold"
-                                                >
-                                                    Submit Rating
-                                                </button>
-                                                <button 
-                                                    onClick={() => setRatingRideId(null)}
-                                                    className="text-gray-600 hover:underline"
-                                                >
-                                                    Cancel
-                                                </button>
-                                            </div>
                                         </div>
                                     )}
                                 </div>
@@ -280,67 +309,103 @@ const RiderDashboard = () => {
                     {/* RIDE HISTORY SECTION */}
                     {activeTab === 'history' && (
                         <div>
-                            <h2 className="text-2xl font-bold text-gray-800 mb-6">Your Ride History</h2>
+                            <h2 className="text-2xl font-bold text-gray-800 mb-6">My Ride History</h2>
                             <div className="space-y-4">
-                                {rides && rides.length > 0 ? (
-                                    rides.map((ride) => (
-                                        <div key={ride.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                                            <div className="flex justify-between items-start">
-                                                <div className="flex-1">
-                                                    <p className="font-semibold text-gray-800">
-                                                        Ride with {ride?.driver?.user?.name || 'Unknown Driver'}
-                                                    </p>
-                                                    <p className="text-sm text-gray-500 mt-1">
-                                                        {new Date(ride.createdTime).toLocaleDateString()} at {new Date(ride.createdTime).toLocaleTimeString()}
-                                                    </p>
-                                                    <p className="text-sm text-gray-600 mt-2">
-                                                        {ride?.pickupLocation || 'N/A'} → {ride?.destination || 'N/A'}
-                                                    </p>
+                                {rideHistory.length > 0 ? (
+                                    rideHistory.map(ride => (
+                                        <div key={ride.id} className="p-6 border border-gray-200 rounded-lg hover:shadow-md transition">
+                                            <div className="flex flex-col lg:flex-row justify-between gap-4">
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3 flex-grow">
+                                                    <div>
+                                                        <span className="text-sm font-semibold text-gray-600">Status</span>
+                                                        <p className={`mt-1 inline-block px-2 py-1 rounded text-sm font-semibold ${
+                                                            ride.rideStatues === 'ENDED' ? 'bg-green-100 text-green-800' :
+                                                            ride.rideStatues === 'CONFIRMED' ? 'bg-blue-100 text-blue-800' :
+                                                            ride.rideStatues === 'CANCELLED' ? 'bg-red-100 text-red-800' :
+                                                            'bg-yellow-100 text-yellow-800'
+                                                        }`}>
+                                                            {ride.rideStatues}
+                                                        </p>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-sm font-semibold text-gray-600">Fare</span>
+                                                        <p className="text-lg font-bold text-gray-800 mt-1">₹{ride?.fare?.toFixed(2)}</p>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-sm font-semibold text-gray-600">Driver</span>
+                                                        <p className="text-gray-800 mt-1">{ride?.driver?.user?.name || 'N/A'}</p>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-sm font-semibold text-gray-600">Vehicle ID</span>
+                                                        <p className="text-gray-800 mt-1">{ride?.driver?.vehicleId || 'N/A'}</p>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-sm font-semibold text-gray-600">Payment Method</span>
+                                                        <p className="text-gray-800 mt-1">{ride?.paymentMethod || 'N/A'}</p>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-sm font-semibold text-gray-600">Created</span>
+                                                        <p className="text-gray-800 mt-1">{formatDateTime(ride.createdTime)}</p>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-sm font-semibold text-gray-600">Started</span>
+                                                        <p className="text-gray-800 mt-1">{formatDateTime(ride.startedAt)}</p>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-sm font-semibold text-gray-600">Ended</span>
+                                                        <p className="text-gray-800 mt-1">{formatDateTime(ride.endedAt)}</p>
+                                                    </div>
+                                                    <div className="md:col-span-2">
+                                                        <span className="text-sm font-semibold text-gray-600">Pickup Location</span>
+                                                        <p className="text-gray-800 mt-1">
+                                                            {ride?.pickUpLocation?.coordinates ? 
+                                                                <GeoLocationName 
+                                                                    lat={ride.pickUpLocation.coordinates[1]} 
+                                                                    lng={ride.pickUpLocation.coordinates[0]} 
+                                                                /> : 'N/A'}
+                                                        </p>
+                                                    </div>
+                                                    <div className="md:col-span-2">
+                                                        <span className="text-sm font-semibold text-gray-600">Drop-off Location</span>
+                                                        <p className="text-gray-800 mt-1">
+                                                            {ride?.dropOffLocation?.coordinates ? 
+                                                                <GeoLocationName 
+                                                                    lat={ride.dropOffLocation.coordinates[1]} 
+                                                                    lng={ride.dropOffLocation.coordinates[0]} 
+                                                                /> : 'N/A'}
+                                                        </p>
+                                                    </div>
                                                 </div>
-                                                <div className="text-right ml-4">
-                                                    <p className="font-bold text-xl text-gray-900">${ride?.fare?.toFixed(2)}</p>
-                                                    <span className={`inline-block mt-2 px-3 py-1 text-xs font-semibold rounded-full ${
-                                                        ride.rideStatues === 'ENDED' ? 'bg-green-100 text-green-800' : 
-                                                        ride.rideStatues === 'CANCELLED' ? 'bg-red-100 text-red-800' : 
-                                                        'bg-yellow-100 text-yellow-800'
-                                                    }`}>
-                                                        {ride.rideStatues}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                            
-                                            {/* View Details Button */}
-                                            <div className="mt-4 flex gap-3">
-                                                <button
-                                                    onClick={() => handleViewRideDetails(ride.id)}
-                                                    className="text-sm bg-gray-800 text-white py-2 px-4 rounded-md hover:bg-gray-900 transition-colors"
-                                                >
-                                                    View Details
-                                                </button>
+                                                
+                                                {/* Rating Section for ENDED rides */}
                                                 {ride.rideStatues === 'ENDED' && (
-                                                    <button 
-                                                        onClick={() => {
-                                                            setRatingRideId(ride.id);
-                                                            handleViewRideDetails(ride.id);
-                                                        }}
-                                                        className="text-sm bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 transition-colors"
-                                                    >
-                                                        Rate Driver
-                                                    </button>
+                                                    <div className="flex-shrink-0 flex flex-col justify-center items-center gap-3 lg:border-l lg:pl-6 border-gray-200">
+                                                        <span className="text-sm font-semibold text-gray-600">Rate Driver</span>
+                                                        <div className="flex items-center gap-2">
+                                                            <input 
+                                                                type="number" 
+                                                                min="1" 
+                                                                max="5" 
+                                                                placeholder="1-5" 
+                                                                value={ratings[ride.id] || ''}
+                                                                onChange={(e) => handleRatingChange(ride.id, e.target.value)}
+                                                                className="w-20 p-2 border border-gray-300 rounded-md text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                            />
+                                                            <button 
+                                                                onClick={() => handleRateSubmit(ride.id)}
+                                                                disabled={!ratings[ride.id] || isLoading}
+                                                                className="py-2 px-4 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition font-semibold"
+                                                            >
+                                                                Submit
+                                                            </button>
+                                                        </div>
+                                                    </div>
                                                 )}
                                             </div>
                                         </div>
                                     ))
                                 ) : (
-                                    <div className="text-center py-12">
-                                        <p className="text-gray-500 text-lg">You haven't taken any rides yet.</p>
-                                        <button 
-                                            onClick={() => navigate('/rideRequest')}
-                                            className="mt-4 bg-black text-white py-2 px-6 rounded-lg hover:bg-gray-800 transition duration-300"
-                                        >
-                                            Book Your First Ride
-                                        </button>
-                                    </div>
+                                    <p className="text-gray-500 py-8 text-center">No past rides found.</p>
                                 )}
                             </div>
                         </div>

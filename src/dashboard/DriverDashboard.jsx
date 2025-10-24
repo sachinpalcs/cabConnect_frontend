@@ -46,14 +46,14 @@ const DriverDashboard = () => {
 
     useEffect(() => {
         dispatch(getMyDriverProfile());
-        dispatch(getMyDriverRides()); // Fetches ride history
-        dispatch(fetchPendingRequests()); // 3. DISPATCH the action to get new job offers
+        dispatch(getMyDriverRides());
+        dispatch(fetchPendingRequests());
     }, [dispatch]);
 
     const rideHistory = rides?.content || [];
     const newPendingRequests = pendingRequests?.data || [];
     
-    const handleAcceptRide = async (rideRequestId) => { // This is now the correct ID
+    const handleAcceptRide = async (rideRequestId) => {
         const result = await dispatch(acceptRide(rideRequestId));
         if (result.meta.requestStatus === 'fulfilled') {
             navigate(`/driver/ride`);

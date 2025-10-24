@@ -54,6 +54,7 @@ const RiderService = {
     rateDriver,
     getMyProfile,
     getAllMyRides,
+    getRideDetails,
 };
 
 export default RiderService;
