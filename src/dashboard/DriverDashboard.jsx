@@ -12,6 +12,8 @@ import {
 } from '../redux/DriverSlice';
 import MapPicker from '../component/map/MapPicker';
 import GeoLocationName from '../component/map/GeoLocationName';
+import RideHistory from '../pages/RideHistory';
+
 
 const MapPinIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
@@ -19,30 +21,18 @@ const MapPinIcon = () => (
     </svg>
 );
 
-// Helper function to format date and time
-const formatDateTime = (dateTimeString) => {
-    if (!dateTimeString) return 'N/A';
-    try {
-        return new Intl.DateTimeFormat('en-US', {
-            year: 'numeric', month: 'short', day: 'numeric',
-            hour: 'numeric', minute: '2-digit', hour12: true
-        }).format(new Date(dateTimeString));
-    } catch (e) {
-        return 'Invalid Date';
-    }
-};
 
 const DriverDashboard = () => {
     const dispatch = useDispatch();
     const navigate = useNavigate();
-    // 2. SELECT the new `pendingRequests` state from the Redux store
     const { profile, rides, pendingRequests, isLoading, isError, message } = useSelector((state) => state.drivers);
 
-    const [ratings, setRatings] = useState({});
     const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
     const [isMapModalOpen, setIsMapModalOpen] = useState(false);
     const [selectedLocation, setSelectedLocation] = useState(null);
     const [locationError, setLocationError] = useState('');
+
+    const [activeTab, setActiveTab] = useState('profile');
 
     useEffect(() => {
         dispatch(getMyDriverProfile());
@@ -60,17 +50,6 @@ const DriverDashboard = () => {
         }
     };
     
-    const handleRatingChange = (rideId, rating) => {
-        setRatings(prev => ({ ...prev, [rideId]: rating }));
-    };
-
-    const handleRateSubmit = (rideId) => {
-        const rating = ratings[rideId];
-        if (rating) {
-            dispatch(rateRider({ rideId, rating: parseInt(rating, 10) }));
-            setRatings(prev => ({ ...prev, [rideId]: '' }));
-        }
-    };
 
     const handleAvailabilityToggle = () => {
         if (profile) {
@@ -107,6 +86,15 @@ const DriverDashboard = () => {
             setIsMapModalOpen(false);
             setSelectedLocation(null);
         }
+    };
+
+    const handleRateRiderSubmit = (rideId, rating) => {
+        dispatch(rateRider({ rideId, rating })).then((result) => {
+            if (!result.error) {
+                alert('Rider rated successfully!');
+                dispatch(getMyDriverRides());
+            }
+        });
     };
 
     if (isLoading && !profile) {
@@ -171,13 +159,16 @@ const DriverDashboard = () => {
                 </div>
             )}
 
-            <div className="min-h-screen bg-gray-100 p-4 sm:p-6">
-                <div className="max-w-4xl mx-auto space-y-6">
-                    {/* --- SECTION 1: Profile --- */}
-                    {profile && (
-                        <div className="bg-white p-6 rounded-lg shadow-md">
-                            <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-4 gap-4">
-                                <h2 className="text-2xl font-bold text-gray-800">My Profile</h2>
+            <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
+                <div className="max-w-7xl mx-auto">
+                    
+                    {/* Header Section (Adapted for Driver) */}
+                    <div className="bg-white p-6 rounded-lg shadow-md mb-6">
+                        <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+                            <h1 className="text-3xl font-bold text-gray-800">Driver Dashboard</h1>
+                            
+                            {/* Driver-specific controls, moved here from old profile card */}
+                            {profile && (
                                 <div className="flex items-center gap-3">
                                     <button
                                         onClick={() => setIsLocationModalOpen(true)}
@@ -194,108 +185,155 @@ const DriverDashboard = () => {
                                         {isLoading ? '...' : profile.available ? 'Go Offline' : 'Go Online'}
                                     </button>
                                 </div>
-                            </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t pt-4">
-                                <p><strong className="font-semibold text-gray-600">Name:</strong> {profile?.user?.name}</p>
-                                <p><strong className="font-semibold text-gray-600">Email:</strong> {profile?.user?.email}</p>
-                                <p><strong className="font-semibold text-gray-600">Rating:</strong> {profile?.rating?.toFixed(1) || 'N/A'} ★</p>
-                                <p><strong className="font-semibold text-gray-600">Vehicle ID:</strong> {profile?.vehicleId}</p>
-                                <p>
-                                    <strong className="font-semibold text-gray-600">Status:</strong> 
-                                    <span className={`ml-2 font-bold ${profile.available ? 'text-green-600' : 'text-red-600'}`}>
-                                        {profile.available ? 'Available for Rides' : 'Offline'}
-                                    </span>
-                                </p>
-                                <p className="sm:col-span-2">
-                                    <strong className="font-semibold text-gray-600">Current Location:</strong> 
-                                    <span className="ml-2 text-gray-800">
-                                        {profile?.currentLocation ? <GeoLocationName lat={profile.currentLocation.coordinates[1]} lng={profile.currentLocation.coordinates[0]} /> : 'Not available'}
-                                    </span>
-                                </p>
-                            </div>
-                        </div>
-                    )}
-                    
-                    {/* --- SECTION 2: New Ride Requests --- */}
-                    <div className="bg-white p-6 rounded-lg shadow-md">
-                        <h2 className="text-2xl font-bold text-gray-800 mb-2">New Ride Requests</h2>
-                        <div className="space-y-4">
-                            
-                            {newPendingRequests.length > 0 ? (
-                                newPendingRequests.map(request => (
-                                    <div key={request.id} className="p-4 border-t border-gray-200 first:border-t-0 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 flex-grow">
-                                            <p><strong className="font-semibold text-gray-600">Rider:</strong> {request?.rider?.user.name}</p>
-                                            <p><strong className="font-semibold text-gray-600">Fare:</strong> ₹{request?.fare?.toFixed(2)}</p>
-                                            <p className="sm:col-span-2"><strong className="font-semibold text-gray-600">From:</strong> {request?.pickUpLocation?.coordinates ? <GeoLocationName lat={request.pickUpLocation.coordinates[1]} lng={request.pickUpLocation.coordinates[0]} /> : 'N/A'}</p>
-                                            <p className="sm:col-span-2"><strong className="font-semibold text-gray-600">To:</strong> {request?.dropOffLocation?.coordinates ? <GeoLocationName lat={request.dropOffLocation.coordinates[1]} lng={request.dropOffLocation.coordinates[0]} /> : 'N/A'}</p>
-                                             <p><strong className="font-semibold text-gray-600">Rating:</strong> {request?.rider?.rating?.toFixed(2)}</p>
-                                        </div>
-                                        <div className="flex-shrink-0 w-full sm:w-auto">
-                                             <button
-                                                onClick={() => handleAcceptRide(request.id)}
-                                                className="w-full sm:w-auto py-2 px-5 font-bold text-white bg-green-500 rounded-md hover:bg-green-600 transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                                                disabled={isLoading || !profile?.available}
-                                            >
-                                                {!profile?.available ? 'Go Online to Accept' : (isLoading ? 'Accepting...' : 'Accept Ride')}
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))
-                            ) : (
-                                <p className="text-gray-500 py-4 text-center">No new ride requests at the moment.</p>
                             )}
                         </div>
                     </div>
 
-                    {/* --- SECTION 3: Ride History --- */}
-                    <div className="bg-white p-6 rounded-lg shadow-md">
-                        <h2 className="text-2xl font-bold text-gray-800 mb-2">My Ride History</h2>
-                        <div className="space-y-4">
-                             {rideHistory.length > 0 ? (
-                                rideHistory.map(ride => (
-                                    <div key={ride.id} className="p-4 border-t border-gray-200 first:border-t-0">
-                                        <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 flex-grow">
-                                                <p><strong className="font-bold text-gray-700">Rider:</strong> {ride?.rider?.user.name}</p>
-                                                <p><strong className="font-bold text-gray-700">Status:</strong> {ride?.rideStatues}</p>
-                                                <p><strong className="font-bold text-gray-700">Payment Method:</strong> {ride?.paymentMethod}</p>
-                                                <p><strong className="font-bold text-gray-700">Fare:</strong> ₹{ride?.fare?.toFixed(2)}</p>
-                                                <p><strong className="font-bold text-gray-700">Rider Rating:</strong> {ride?.rider?.rating.toFixed(2)}</p>
-                                                <p className="sm:col-span-2"><strong className="font-bold text-gray-700">Create Date and Time:</strong> {formatDateTime(ride.createdTime)}</p>
-                                                <p className="sm:col-span-2"><strong className="font-bold text-gray-700">Start Date and Time:</strong> {formatDateTime(ride.startedAt)}</p>
-                                                <p className="sm:col-span-2"><strong className="font-bold text-gray-700">End Date and Time:</strong> {formatDateTime(ride.endedAt)}</p>
-                                                <p className="sm:col-span-2"><strong className="font-bold text-gray-700">Pick Up Location:</strong> {ride?.pickUpLocation?.coordinates ? <GeoLocationName lat={ride.pickUpLocation.coordinates[1]} lng={ride.pickUpLocation.coordinates[0]} /> : 'N/A'}</p>
-                                                <p className="sm:col-span-2"><strong className="font-bold text-gray-700">Drop off Location:</strong> {ride?.dropOffLocation?.coordinates ? <GeoLocationName lat={ride.dropOffLocation.coordinates[1]} lng={ride.dropOffLocation.coordinates[0]} /> : 'N/A'}</p>
+                    {/* Tabs Navigation (Adapted for Driver) */}
+                    <div className="bg-white rounded-lg shadow-md mb-6">
+                        <div className="flex border-b">
+                            <button
+                                onClick={() => setActiveTab('profile')}
+                                className={`flex-1 py-4 px-6 text-center font-semibold transition-colors ${
+                                    activeTab === 'profile'
+                                        ? 'border-b-2 border-black text-black'
+                                        : 'text-gray-500 hover:text-gray-700'
+                                }`}
+                            >
+                                Profile
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('requests')}
+                                className={`flex-1 py-4 px-6 text-center font-semibold transition-colors ${
+                                    activeTab === 'requests'
+                                        ? 'border-b-2 border-black text-black'
+                                        : 'text-gray-500 hover:text-gray-700'
+                                }`}
+                            >
+                                Ride Requests ({newPendingRequests.length})
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('history')}
+                                className={`flex-1 py-4 px-6 text-center font-semibold transition-colors ${
+                                    activeTab === 'history'
+                                        ? 'border-b-2 border-black text-black'
+                                        : 'text-gray-500 hover:text-gray-700'
+                                }`}
+                            >
+                                Ride History
+                            </button>
+                        </div>
+                    </div>
 
-                                                <p><strong className="font-bold text-gray-700">Driver:</strong> {ride?.driver?.user.name}</p>
-                                                <p><strong className="font-bold text-gray-700">Vehicle ID:</strong> {ride?.driver?.vehicleId}</p>
+                    {/* Content Sections (Single card with conditional content) */}
+                    <div className="bg-white p-6 rounded-lg shadow-md">
+                        
+                        {/* --- PROFILE TAB --- */}
+                        {activeTab === 'profile' && (
+                            <div>
+                                <h2 className="text-2xl font-bold text-gray-800 mb-6">Your Profile</h2>
+                                {profile ? (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div className="bg-gray-50 p-4 rounded-lg">
+                                            <span className="text-sm font-semibold text-gray-600">Name</span>
+                                            <p className="text-lg text-gray-800 mt-1">{profile.user?.name || 'N/A'}</p>
+                                        </div>
+                                        <div className="bg-gray-50 p-4 rounded-lg">
+                                            <span className="text-sm font-semibold text-gray-600">Email</span>
+                                            <p className="text-lg text-gray-800 mt-1">{profile.user?.email || 'N/A'}</p>
+                                        </div>
+                                        <div className="bg-gray-50 p-4 rounded-lg">
+                                            <span className="text-sm font-semibold text-gray-600">Rating</span>
+                                            <div className="flex items-center gap-2 mt-1">
+                                                <span className="text-yellow-500 text-2xl">★</span>
+                                                <span className="text-lg font-semibold text-gray-800">
+                                                    {profile.rating ? profile.rating.toFixed(1) : '0.0'}
+                                                </span>
                                             </div>
-                                            {ride.rideStatues === 'ENDED' && (
-                                                <div className="flex-shrink-0 w-full sm:w-auto flex items-center gap-2">
-                                                     <input 
-                                                        type="number" 
-                                                        min="1" max="5" 
-                                                        placeholder="Rate" 
-                                                        value={ratings[ride.id] || ''}
-                                                        onChange={(e) => handleRatingChange(ride.id, e.target.value)}
-                                                        className="w-20 p-2 border rounded-md"
-                                                    />
-                                                    <button 
-                                                        onClick={() => handleRateSubmit(ride.id)}
-                                                        className="py-2 px-4 bg-blue-500 text-white rounded-md hover:bg-blue-600"
-                                                    >
-                                                        Submit
-                                                    </button>
-                                                </div>
-                                            )}
+                                        </div>
+                                        <div className="bg-gray-50 p-4 rounded-lg">
+                                            <span className="text-sm font-semibold text-gray-600">Vehicle ID</span>
+                                            <p className="text-lg text-gray-800 mt-1">{profile.vehicleId || 'N/A'}</p>
+                                        </div>
+                                        <div className="bg-gray-50 p-4 rounded-lg">
+                                            <span className="text-sm font-semibold text-gray-600">Status</span>
+                                            <p className={`text-lg font-semibold mt-1 ${profile.available ? 'text-green-600' : 'text-red-600'}`}>
+                                                {profile.available ? 'Available' : 'Offline'}
+                                            </p>
+                                        </div>
+                                        <div className="bg-gray-50 p-4 rounded-lg md:col-span-2">
+                                            <span className="text-sm font-semibold text-gray-600">Current Location</span>
+                                            <p className="text-lg text-gray-800 mt-1">
+                                                {profile?.currentLocation ? <GeoLocationName lat={profile.currentLocation.coordinates[1]} lng={profile.currentLocation.coordinates[0]} /> : 'Not available'}
+                                            </p>
                                         </div>
                                     </div>
-                                ))
-                            ) : (
-                                <p className="text-gray-500 py-4 text-center">No past rides found.</p>
-                            )}
-                        </div>
+                                ) : (
+                                    <p className="text-gray-500 text-center py-8">Loading profile...</p>
+                                )}
+                            </div>
+                        )}
+
+                        {/* --- RIDE REQUESTS TAB --- */}
+                        {activeTab === 'requests' && (
+                            <div>
+                                <h2 className="text-2xl font-bold text-gray-800 mb-6">New Ride Requests</h2>
+                                <div className="space-y-4">
+                                    {newPendingRequests.length > 0 ? (
+                                        newPendingRequests.map(request => (
+                                            <div key={request.id} className="p-6 border border-gray-200 rounded-lg hover:shadow-md transition">
+                                                <div className="flex flex-col lg:flex-row justify-between gap-4">
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3 flex-grow">
+                                                        <div>
+                                                            <span className="text-sm font-semibold text-gray-600">Rider</span>
+                                                            <p className="text-lg text-gray-800 mt-1">{request?.rider?.user.name}</p>
+                                                        </div>
+                                                        <div>
+                                                            <span className="text-sm font-semibold text-gray-600">Rider Rating</span>
+                                                            <p className="text-lg text-gray-800 mt-1">{request?.rider?.rating?.toFixed(1)} ★</p>
+                                                        </div>
+                                                        <div>
+                                                            <span className="text-sm font-semibold text-gray-600">Fare</span>
+                                                            <p className="text-xl font-bold text-gray-800 mt-1">₹{request?.fare?.toFixed(1)}</p>
+                                                        </div>
+                                                        <div className="md:col-span-2">
+                                                            <span className="text-sm font-semibold text-gray-600">From</span>
+                                                            <p className="text-gray-800 mt-1">{request?.pickUpLocation?.coordinates ? <GeoLocationName lat={request.pickUpLocation.coordinates[1]} lng={request.pickUpLocation.coordinates[0]} /> : 'N/A'}</p>
+                                                        </div>
+                                                        <div className="md:col-span-2">
+                                                            <span className="text-sm font-semibold text-gray-600">To</span>
+                                                            <p className="text-gray-800 mt-1">{request?.dropOffLocation?.coordinates ? <GeoLocationName lat={request.dropOffLocation.coordinates[1]} lng={request.dropOffLocation.coordinates[0]} /> : 'N/A'}</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex-shrink-0 flex flex-col justify-center items-center gap-3 lg:border-l lg:pl-6 border-gray-200">
+                                                        <button
+                                                            onClick={() => handleAcceptRide(request.id)}
+                                                            className="w-full sm:w-auto py-3 px-6 font-bold text-white bg-green-500 rounded-lg hover:bg-green-600 transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                            disabled={isLoading || !profile?.available}
+                                                        >
+                                                            {!profile?.available ? 'Go Online to Accept' : (isLoading ? 'Accepting...' : 'Accept Ride')}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <p className="text-gray-500 py-8 text-center">No new ride requests at the moment.</p>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* --- RIDE HISTORY TAB --- */}
+
+                        {activeTab === 'history' && (
+                            <RideHistory
+                                rideHistory={rideHistory}
+                                isLoading={isLoading}
+                                userType="driver"
+                                onRateSubmit={handleRateRiderSubmit}
+                            />
+                        )}
                     </div>
                 </div>
             </div>
