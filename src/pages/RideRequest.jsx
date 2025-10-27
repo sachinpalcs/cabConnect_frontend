@@ -1,7 +1,7 @@
-import React, { useState, useEffect, use } from 'react';
+import React, { useState, useEffect} from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { requestRide, reset, cancelRideRequest } from '../redux/RideRequestSlice';
+import { requestRide, reset, cancelRideRequest, getRideRequestDetails } from '../redux/RideRequestSlice';
 import MapPicker from '../component/map/MapPicker';
 import GeoLocationName from '../component/map/GeoLocationName';
 
@@ -15,43 +15,72 @@ const RideRequest = () => {
 
     const dispatch = useDispatch();
     const { isLoading, isSuccess, isError, message, rideRequest } = useSelector((state) => state.rideRequest);
+
     const rideRequestId = rideRequest?.id;
+    const displayedStatus = rideRequest?.rideRequestStatues;
+
+    useEffect(() => {
+        if(rideRequestId) {
+            dispatch(getRideRequestDetails(rideRequestId));
+        }
+    }, [dispatch, rideRequestId]);
+
+    useEffect(() => {
+        let pollingInterval = null;
+        if (displayedStatus === 'PENDING' && isSuccess && rideRequestId) {
+            pollingInterval = setInterval(() => {
+                dispatch(getRideRequestDetails(rideRequestId));
+            }, 3000);
+        }
+
+        return () => {
+            if (pollingInterval) {
+                clearInterval(pollingInterval);
+            }
+        };
+    }, [displayedStatus, isSuccess, rideRequestId, dispatch]);
+
+
+    useEffect(() => {
+        if (displayedStatus !== 'PENDING') {
+            const timer = setTimeout(() => {
+                dispatch(reset());
+            }, 5000);
+            return () => clearTimeout(timer);   
+        }
+    }, [displayedStatus, dispatch]);
 
     useEffect(() => {
         if (isError) {
             alert(message || 'Failed to request ride.');
             dispatch(reset());
-            if (!isSuccess && !rideRequest) {
-                dispatch(reset());
-            } else {
-                dispatch(clearError());
-            }
         }
     }, [isError, message, dispatch]);
 
+
     useEffect(() => {
         let autoCancelTimeout = null;
-        if (isSuccess && rideRequestId) {
+        if (isSuccess && rideRequestId && displayedStatus === 'PENDING') {
             autoCancelTimeout = setTimeout(() => {
-                if(rideRequest?.id === rideRequestId) {
+                if(displayedStatus === 'PENDING' ) {
                     alert("We could not find a driver in time. Your request has been automatically cancelled.");
-                    dispatch(cancelRideRequest(rideRequest.id));
+                    dispatch(cancelRideRequest(rideRequestId));
                 }
-            }, 120000);
+            }, 120000); // 120 seconds
         }
         return () => {
             if(autoCancelTimeout) {
                 clearTimeout(autoCancelTimeout);
             }
         };
-    }, [isSuccess, rideRequestId, dispatch, rideRequest]);
+    }, [isSuccess, rideRequestId, displayedStatus, dispatch]);
 
     useEffect(() => {
         if(!isSuccess && !rideRequest) {
-          setPickUpLocation(null);
-          setDropOffLocation(null);
-          setPaymentMethod('CASH');
-          setIsSettingPickup(true);
+            setPickUpLocation(null);
+            setDropOffLocation(null);
+            setPaymentMethod('CASH');
+            setIsSettingPickup(true);
         }
     }, [isSuccess, rideRequest]);
 
@@ -61,7 +90,7 @@ const RideRequest = () => {
         if (isSettingPickup) {
             setPickUpLocation(latlng);
         } else {
-        setDropOffLocation(latlng);
+            setDropOffLocation(latlng);
         }
     };
 
@@ -89,36 +118,113 @@ const RideRequest = () => {
     };
 
     const handleCancelRequest = () => {
-        if (rideRequest && rideRequest.id) {
-            dispatch(cancelRideRequest(rideRequest.id));
+        if (rideRequestId) {
+            dispatch(cancelRideRequest(rideRequestId));
         } else {
             alert("Could not find ride ID to cancel.");
             dispatch(reset());
         }
     };
+
+    const getStatusText = () => {
+        switch (displayedStatus) {
+            case 'PENDING':
+                return 'We are now finding a driver for you.';
+            case 'CANCELLED':
+                return 'Your ride has been cancelled.';
+            case 'CONFIRMED':
+                return 'Your ride is confirmed!';
+            default:
+                return 'We are finding a driver for you.';
+        }
+    };
+
+    const getStatusBadgeClass = () => {
+        switch (displayedStatus) {
+            case 'PENDING':
+                return 'font-semibold text-yellow-800 bg-yellow-100 px-2 py-1 rounded-full';
+            case 'CANCELLED':
+                return 'font-semibold text-red-800 bg-red-100 px-2 py-1 rounded-full';
+            case 'CONFIRMED':
+                return 'font-semibold text-green-800 bg-green-100 px-2 py-1 rounded-full';
+            default:
+                return 'font-semibold text-gray-800 bg-gray-100 px-2 py-1 rounded-full';
+        }
+    };
+    
+    console.log("Ride Request from RideRequest.jsx:", rideRequest);
+    console.log("Displayed Status from RideRequest.jsx:", displayedStatus);
+
     return (
         <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
+            <style>
+            {`
+                @keyframes fillProgress {
+                    from { transform: scaleX(0); }
+                    to { transform: scaleX(1); }
+                }
+                .animate-fillProgress {
+                    animation: fillProgress 120s linear;
+                    transform-origin: left;
+                }
+            `}
+            </style>
             <div className="w-full max-w-screen-xl mx-auto">
                 <div className="bg-white p-6 md:p-8 rounded-lg shadow-lg">
                     {isSuccess && rideRequest ? (
                         // SUCCESS VIEW
                         <div className="max-w-lg mx-auto">
-                            <h1 className="text-2xl font-bold text-gray-800 text-center mb-4">Ride Requested!</h1>
-                            <div className="text-center p-6 bg-green-50 border border-green-200 rounded-md space-y-3">
-                                <p className="text-lg text-gray-700">We are now finding a driver for you.</p>
+                            <h1 className="text-2xl font-bold text-gray-800 text-center mb-4">
+                                {displayedStatus === 'CANCELLED' ? 'Ride Cancelled' :
+                                 displayedStatus === 'CONFIRMED' ? 'Ride Confirmed' :
+                                'Ride Requested!'}
+                            </h1>
+                            <div className={`text-center p-6 border rounded-md space-y-3 ${
+                               displayedStatus === 'CANCELLED' ? 'bg-red-50 border-red-200' : 
+                               displayedStatus === 'CONFIRMED' ? 'bg-green-50 border-green-200' :
+                                'bg-yellow-50 border-yellow-200'
+                            }`}>
+                                <p className={`text-lg ${
+                                    displayedStatus === 'CANCELLED' ? 'text-red-700 font-semibold' : 'text-gray-700'
+                                }`}>
+                                    {getStatusText()}
+                                </p>
                                 <div>
                                     <p className="text-sm font-medium text-gray-500">ESTIMATED FARE</p>
-                                    <p className="text-4xl font-bold text-green-600">₹{rideRequest.fare.toFixed(2) || "Calculating..."}</p>
+                                    <p className={`text-4xl font-bold ${
+                                        displayedStatus === 'CANCELLED' ? 'text-red-600' :
+                                        displayedStatus === 'CONFIRMED' ? 'text-green-600' :
+                                        'text-yellow-700'
+                                    }`}>
+                                        ₹{(rideRequest.fare || 0).toFixed(2)}
+                                    </p>
                                 </div>
                                 <p className="text-md text-gray-600">
-                                    Status: <span className="font-semibold text-yellow-800 bg-yellow-100 px-2 py-1 rounded-full">{rideRequest?.rideRequestStatues}</span>
+                                    Status: <span className={getStatusBadgeClass()}>
+                                        {displayedStatus || 'PENDING'}
+                                    </span>
                                 </p>
                             </div>
-                            <button onClick={handleCancelRequest}
-                                disabled={isLoading}
-                                className="w-full mt-6 py-3 px-4 rounded-md bg-red-600 text-white font-semibold hover:bg-red-700 disabled:bg-gray-400">
-                                {isLoading ? 'Cancelling...' : 'Cancel Ride Request'}
-                            </button>
+                            {displayedStatus === 'PENDING' && (
+                                <>
+                                    {/** --- ADDED PROGRESS BAR --- */}
+                                    <div className='my-4'>
+                                        <p className="text-sm text-center text-gray-500 mb-1">
+                                            Auto-cancelling in 2 minutes...
+                                        </p>
+                                        <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                                            <div className="bg-blue-600 h-2 rounded-full animate-fillProgress"></div>
+                                        </div>
+                                    </div>
+                                    {/** --- END OF ADDED PROGRESS BAR --- */}
+
+                                    <button onClick={handleCancelRequest}
+                                        disabled={isLoading}
+                                        className="w-full mt-2 py-3 px-4 rounded-md bg-red-600 text-white font-semibold hover:bg-red-700 disabled:bg-gray-400">
+                                        {isLoading ? 'Cancelling...' : 'Cancel Ride Request'}
+                                    </button>
+                                </>
+                            )}
                         </div>
                     ) : (
                         // FORM VIEW
@@ -163,7 +269,7 @@ const RideRequest = () => {
                             </div>
                         </>
                     )}
-                    <div className="bg-white p-8 rounded-xl shadow-lg max-w-md w-full text-center">
+                    <div className="mt-8 max-w-md w-full text-center mx-auto">
                         <button 
                             onClick={() => navigate('/rider/dashboard')}
                             className="w-full py-3 px-6 font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition duration-200 shadow-md hover:shadow-lg"

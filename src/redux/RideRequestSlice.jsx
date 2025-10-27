@@ -11,7 +11,7 @@ const getRideFromStorage = () => {
         }
     } catch (error) {
     console.error("Failed to parse ride from localStorage", error);
-    localStorage.removeItem(RIDE_STORAGE_KEY); // Clear bad data
+    localStorage.removeItem(RIDE_STORAGE_KEY);
     }
     return null;
 };
@@ -50,6 +50,19 @@ export const cancelRideRequest = createAsyncThunk('riders/cancelRideRequest', as
         }
     }
 );
+
+export const getRideRequestDetails = createAsyncThunk('riders/getRideRequestDetails', async (rideRequestId, thunkAPI) => {
+    try {
+        return await RiderService.getRideRequestDetails(rideRequestId);
+    } catch (error) {
+        const message =
+            (error.response && error.response.data && error.response.data.message) ||
+            error.message ||
+            error.toString();
+        return thunkAPI.rejectWithValue(message);
+    }
+});
+
 export const RideRequestSlice = createSlice({
     name: 'rideRequest',
     initialState,
@@ -94,17 +107,36 @@ export const RideRequestSlice = createSlice({
             .addCase(cancelRideRequest.fulfilled, (state, action) => {
                 state.isLoading = false;
                 state.isSuccess = true;
-                state.rideRequest = null;
+                state.rideRequest = action.payload.data;
                 state.message = action.payload.message || 'Ride cancelled successfully';
-                localStorage.removeItem(RIDE_STORAGE_KEY);
+                // localStorage.removeItem(RIDE_STORAGE_KEY);
             })
             .addCase(cancelRideRequest.rejected, (state, action) => {
                 state.isLoading = false;
                 state.isError = true;
                 state.message = action.payload;
-    });
+            })
+            // Get Ride Request Details
+            .addCase(getRideRequestDetails.pending, (state) => {
+                // state.isLoading = true;
+            })
+            .addCase(getRideRequestDetails.fulfilled, (state, action) => {
+                state.isLoading = false;
+                state.isSuccess = true;
+                state.rideRequest = action.payload.data;
+                try {
+                    localStorage.setItem(RIDE_STORAGE_KEY, JSON.stringify(action.payload.data));
+                } catch (error) {
+                    console.error("Failed to save ride to localStorage", error);
+                }
+            })
+            .addCase(getRideRequestDetails.rejected, (state, action) => {
+                state.isLoading = false;
+                state.isError = true;
+                state.message = action.payload;
+            });
     },
 });
 
-export const { reset } = RideRequestSlice.actions;
+export const { reset, clearError } = RideRequestSlice.actions;
 export default RideRequestSlice.reducer;

@@ -223,6 +223,12 @@ const RiderDashboard = () => {
                                                     {currentRideDetails?.driver?.vehicleId || 'N/A'}
                                                 </p>
                                             </div>
+                                            <div>
+                                                <span className="text-sm font-semibold text-gray-600">OTP</span>
+                                                <p className="text-lg text-gray-800 mt-1">
+                                                    {currentRideDetails?.otp || 'N/A'}
+                                                </p>
+                                            </div>
                                         </div>
                                     </div>
 

@@ -46,6 +46,11 @@ const getAllMyRides = async (pageRequest = { pageOffset: 0, pageSize: 10 }) => {
     return response.data;
 };
 
+// Get rideRequest details by id
+const getRideRequestDetails = async (rideRequestId) => {
+    const response = await api.get(API_URL + `getRideRequestDetails/${rideRequestId}`);
+    return response.data;
+};
 
 const RiderService = {
     requestRide,
@@ -55,6 +60,7 @@ const RiderService = {
     getMyProfile,
     getAllMyRides,
     getRideDetails,
+    getRideRequestDetails,
 };
 
 export default RiderService;
