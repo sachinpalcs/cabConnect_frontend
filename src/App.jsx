@@ -9,6 +9,7 @@ import DriverDashboard from './dashboard/DriverDashboard';
 import RiderDashboard from './dashboard/RiderDashboard';
 import ProtectedRoute from './routes/ProtectedRoute';
 import DriverAfterAccept from './pages/DriverAfterAccpet';
+import ContactUs from './pages/ContactUs';
 
 function App() {
     const router = createBrowserRouter(
@@ -19,6 +20,7 @@ function App() {
                 <Route path="login" element={<Login />} />
                 <Route path="rideRequest" element={<RideRequest />} />
                 <Route path="driver/ride" element={<DriverAfterAccept />} />
+                <Route path="contact-us" element={<ContactUs />} />
                 <Route
                     path="rider/dashboard"
                     element={
