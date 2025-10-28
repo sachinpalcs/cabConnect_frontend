@@ -2,24 +2,47 @@ import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { clearAuth, logout} from '../../redux/AuthSlice';
-import { useEffect } from 'react';
+import { jwtDecode } from 'jwt-decode';
 
+const getRolesFromToken = (token) => {
+    if (!token) {
+        return [];
+    }
+    try {
+        const decodedToken = jwtDecode(token);
+        const rolesFromToken = decodedToken.roles || [];
+
+        if (typeof rolesFromToken === 'string' && rolesFromToken.startsWith('[') && rolesFromToken.endsWith(']')) {
+            return rolesFromToken.replace(/[\[\]]/g, '').split(',');
+        } else if (Array.isArray(rolesFromToken)) {
+            return rolesFromToken;
+        }
+        return [];
+    } catch (error) {
+        console.error("Failed to decode or parse roles from JWT in Header:", error);
+        return [];
+    }
+};
 const Header = () => {
     const navigate = useNavigate();
     const dispatch = useDispatch();
     const { accessToken } = useSelector((state) => state.auth);
 
-    useEffect(() => {
-        if (!accessToken) {
-            navigate('/login');
-        }
-    }, [accessToken, navigate]);
+
+    const userRoles = getRolesFromToken(accessToken);
+    const isAdmin = userRoles.includes('ADMIN');
+    const isDriver = userRoles.includes('DRIVER');
+    const isRider = userRoles.includes('RIDER');
 
     const handleLogout = () => {
         dispatch(logout());
         dispatch(clearAuth())
         navigate('/login');
     };
+    const navLinkClasses = ({ isActive }) =>
+        `px-2 py-1 rounded transition duration-200 ${
+            isActive ? "underline underline-offset-4" : "hover:bg-gray-700"
+        }`;
 
     return (
         <header className="bg-gray-800 text-white shadow-md">
@@ -41,6 +64,42 @@ const Header = () => {
                     >
                         Home
                     </NavLink>
+                    {!accessToken ? (
+                        <>
+                            <NavLink to="/rideRequest" className={navLinkClasses}>
+                                Book a Ride
+                            </NavLink>
+                        </>
+                    ) : (
+                        <>
+                            {isRider && (
+                                <>
+                                    <NavLink to="/rider/dashboard" className={navLinkClasses}>
+                                            Dashboard
+                                    </NavLink>
+                                    <NavLink to="/rideRequest" className={navLinkClasses}>
+                                            Book a Ride
+                                    </NavLink>
+                                </>
+                            )}
+                            {isDriver && (
+                                <>
+                                    <NavLink to="/driver/dashboard" className={navLinkClasses}>
+                                            Dashboard
+                                    </NavLink>
+                                    <NavLink to="/driver/ride" className={navLinkClasses}>
+                                            Active Ride
+                                    </NavLink>
+                                </>
+                            )}
+                            {isAdmin && (
+                                <NavLink to="/admin/dashboard" className={navLinkClasses}>
+                                     Admin Panel
+                                </NavLink>
+                            )}
+                        </>
+                    )}
+
                     <NavLink
                         to="/about"
                         className={({ isActive }) =>
@@ -49,24 +108,6 @@ const Header = () => {
                         }
                     >
                         About
-                    </NavLink>
-                    <NavLink
-                        to="/ride"
-                        className={({ isActive }) =>
-                            `px-2 py-1 rounded transition duration-200 ${isActive ? "underline underline-offset-4" : "hover:bg-gray-700"
-                            }`
-                        }
-                    >
-                        Rider dashboard or Driver dashboard
-                    </NavLink>
-                    <NavLink
-                        to="/drive"
-                        className={({ isActive }) =>
-                            `px-2 py-1 rounded transition duration-200 ${isActive ? "underline underline-offset-4" : "hover:bg-gray-700"
-                            }`
-                        }
-                    >
-                        Ride Request or drive
                     </NavLink>
                     <NavLink
                         to="/contact"
