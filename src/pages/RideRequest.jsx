@@ -16,6 +16,8 @@ const RideRequest = () => {
     const dispatch = useDispatch();
     const { isLoading, isSuccess, isError, message, rideRequest } = useSelector((state) => state.rideRequest);
 
+    const { accessToken } = useSelector((state) => state.auth);
+
     const rideRequestId = rideRequest?.id;
     const displayedStatus = rideRequest?.rideRequestStatues;
 
@@ -151,6 +153,25 @@ const RideRequest = () => {
                 return 'font-semibold text-gray-800 bg-gray-100 px-2 py-1 rounded-full';
         }
     };
+
+    if (!accessToken) {
+        return (
+            <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
+                <div className="bg-white p-8 rounded-lg shadow-lg text-center max-w-md w-full">
+                    <h2 className="text-2xl font-bold text-gray-800 mb-4">Please Login</h2>
+                    <p className="text-gray-600 mb-6">
+                        You must be logged in to request a ride.
+                    </p>
+                    <button 
+                        onClick={() => navigate('/login')}
+                        className="w-full py-3 px-6 font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition duration-200 shadow-md hover:shadow-lg"
+                    >
+                        Go to Login
+                    </button>
+                </div>
+            </div>
+        );
+    }
     
     return (
         <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">

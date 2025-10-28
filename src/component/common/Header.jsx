@@ -2,37 +2,14 @@ import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { clearAuth, logout} from '../../redux/AuthSlice';
-import { jwtDecode } from 'jwt-decode';
+import { useAuth } from '../../hooks/useAuth';
 
-const getRolesFromToken = (token) => {
-    if (!token) {
-        return [];
-    }
-    try {
-        const decodedToken = jwtDecode(token);
-        const rolesFromToken = decodedToken.roles || [];
-
-        if (typeof rolesFromToken === 'string' && rolesFromToken.startsWith('[') && rolesFromToken.endsWith(']')) {
-            return rolesFromToken.replace(/[\[\]]/g, '').split(',');
-        } else if (Array.isArray(rolesFromToken)) {
-            return rolesFromToken;
-        }
-        return [];
-    } catch (error) {
-        console.error("Failed to decode or parse roles from JWT in Header:", error);
-        return [];
-    }
-};
 const Header = () => {
     const navigate = useNavigate();
     const dispatch = useDispatch();
     const { accessToken } = useSelector((state) => state.auth);
 
-
-    const userRoles = getRolesFromToken(accessToken);
-    const isAdmin = userRoles.includes('ADMIN');
-    const isDriver = userRoles.includes('DRIVER');
-    const isRider = userRoles.includes('RIDER');
+    const { isAdmin, isDriver, isRider } = useAuth();
 
     const handleLogout = () => {
         dispatch(logout());
