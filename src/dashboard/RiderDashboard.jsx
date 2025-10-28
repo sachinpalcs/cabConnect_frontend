@@ -55,7 +55,32 @@ const RiderDashboard = () => {
         }
     }, [rideHistory, currentRideDetails, dispatch]);
 
+    useEffect(() => {
+        let interval = null;
+        if (activeTab === 'currentRide' && currentRideDetails?.id) {
 
+            const activeRide = currentRideDetails.rideStatues === 'CONFIRMED' || currentRideDetails.rideStatues === 'ONGOING';
+            if(activeRide) {
+                interval = setInterval(() => {
+                    dispatch(getRideDetails(currentRideDetails.id));
+                }, 3000);
+            }
+
+            return () => {
+                if (interval) {
+                    clearInterval(interval);
+                }
+            };
+        }
+    }, [activeTab, currentRideDetails?.id, currentRideDetails?.rideStatues, dispatch]);
+
+    useEffect(() => {
+        if(currentRideDetails?.rideStatues === 'CANCELLED' || currentRideDetails?.rideStatues === 'ENDED') {
+            dispatch(reset());
+            dispatch(getMyRides());
+            setActiveTab('history');
+        }
+    }, [currentRideDetails, dispatch]);   
 
     const handleCancelRide = (rideId) => {
         if (window.confirm('Are you sure you want to cancel this ride?')) {
@@ -63,7 +88,7 @@ const RiderDashboard = () => {
                 if (!result.error) {
                     alert('Ride cancelled successfully!');
                     dispatch(getMyRides());
-                    dispatch(getRideDetails(activeRide.id));
+                    dispatch(getRideDetails(rideId));
                 }
             });
         }

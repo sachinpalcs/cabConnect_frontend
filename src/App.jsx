@@ -1,39 +1,3 @@
-// import { useState } from 'react'
-// import { createBrowserRouter, createRoutesFromElements, RouterProvider, Route } from 'react-router-dom'
-// import MainLayout from './layout/MainLayout'
-// import Home from './pages/Home'
-// import Signup from './pages/Signup'
-// import Login from './pages/Login'
-// import MapComponent from './component/map/MapComponent'
-
-
-// function App() {
-
-  
-//     const router = createBrowserRouter(
-//       createRoutesFromElements(
-//         <Route path="/" element={<MainLayout/>}>
-//           <Route path='' element={<Home />}/>
-//           <Route path='signup' element={<Signup/>}/>
-//           <Route path='login' element={<Login/>}/>
-//           <Route path='map' element={<MapComponent/>}/>
-
-//         </Route>
-//       )
-//     )
-
-//   return (
-//     <>
-//     <RouterProvider router={router}/>
-//     </>
-//   )
-// }
-
-// export default App
-
-
-
-import React from 'react';
 import { createBrowserRouter, createRoutesFromElements, RouterProvider, Route } from 'react-router-dom';
 import MainLayout from './layout/MainLayout';
 import Home from './pages/Home';
@@ -55,7 +19,6 @@ function App() {
                 <Route path="login" element={<Login />} />
                 <Route path="rideRequest" element={<RideRequest />} />
                 <Route path="driver/ride" element={<DriverAfterAccept />} />
-                {/* <Route path="driver" element={<DriverDashboard />} /> */}
                 <Route
                     path="rider/dashboard"
                     element={

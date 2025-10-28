@@ -152,9 +152,6 @@ const RideRequest = () => {
         }
     };
     
-    console.log("Ride Request from RideRequest.jsx:", rideRequest);
-    console.log("Displayed Status from RideRequest.jsx:", displayedStatus);
-
     return (
         <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
             <style>

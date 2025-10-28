@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -34,14 +34,37 @@ const DriverDashboard = () => {
 
     const [activeTab, setActiveTab] = useState('profile');
 
+    const preRequestCount = useRef(0);
+
     useEffect(() => {
         dispatch(getMyDriverProfile());
         dispatch(getMyDriverRides());
         dispatch(fetchPendingRequests());
     }, [dispatch]);
 
+
+    useEffect(() => {
+        if (profile?.available) {
+            const interval =setInterval(() => {
+                dispatch(fetchPendingRequests());
+
+            }, 3000);
+            return ()=> clearInterval(interval);
+        }
+    }, [dispatch, profile?.available]);
+
     const rideHistory = rides?.content || [];
     const newPendingRequests = pendingRequests?.data || [];
+
+
+    useEffect(() => {
+        const currentCount = newPendingRequests.length;
+        if(currentCount > 0 && currentCount > preRequestCount.current) {
+            if (activeTab !== 'requests')
+                setActiveTab('requests');
+        }
+        preRequestCount.current = currentCount;
+    }, [newPendingRequests.length, activeTab]);
     
     const handleAcceptRide = async (rideRequestId) => {
         const result = await dispatch(acceptRide(rideRequestId));
@@ -49,6 +72,8 @@ const DriverDashboard = () => {
             navigate(`/driver/ride`);
         }
     };
+
+
     
 
     const handleAvailabilityToggle = () => {

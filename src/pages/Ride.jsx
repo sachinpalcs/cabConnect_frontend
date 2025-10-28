@@ -10,21 +10,17 @@ const Ride = () => {
     
     const [pickupLocation, setPickupLocation] = useState(null);
     const [dropoffLocation, setDropoffLocation] = useState(null);
-    const [selecting, setSelecting] = useState('pickup'); // 'pickup' or 'dropoff'
+    const [selecting, setSelecting] = useState('pickup');
     const [estimatedFare, setEstimatedFare] = useState(0);
 
-    // Clean up Redux state on component unmount to prevent stale data
     useEffect(() => {
         return () => {
             dispatch(resetRiderState());
         }
     }, [dispatch]);
 
-    // Simple fare estimation logic (for demonstration)
     useEffect(() => {
         if (pickupLocation && dropoffLocation) {
-            // A real app would use the distance service here.
-            // This is a simplified calculation for UI purposes.
             const latDiff = Math.abs(pickupLocation.lat - dropoffLocation.lat);
             const lngDiff = Math.abs(pickupLocation.lng - dropoffLocation.lng);
             const distance = Math.sqrt(latDiff * latDiff + lngDiff * lngDiff) * 100; // Rough distance factor
