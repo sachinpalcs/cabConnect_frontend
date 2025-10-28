@@ -121,6 +121,13 @@ export const updateDriverLocation = createAsyncThunk('drivers/updateLocation', a
     }
 );
 
+export const getRideDetails = createAsyncThunk('drivers/getRideDetails', async (rideId, thunkAPI) => {
+    try {
+        return await DriverService.getRideDetails(rideId);
+    } catch (error) {
+        return thunkAPI.rejectWithValue('Failed to fetch ride details.');
+    }
+});
 
 export const DriverSlice = createSlice({
     name: 'drivers',
@@ -263,6 +270,20 @@ export const DriverSlice = createSlice({
                 state.pendingRequests = action.payload;
             })
             .addCase(fetchPendingRequests.rejected, (state, action) => {
+                state.isLoading = false;
+                state.isError = true;
+                state.message = action.payload;
+            })
+            // Get Ride Details
+            .addCase(getRideDetails.pending, (state) => {
+                state.isLoading = true;
+            })
+            .addCase(getRideDetails.fulfilled, (state, action) => {
+                state.isLoading = false;
+                state.activeRide = action.payload.data;
+                localStorage.setItem('activeRide', JSON.stringify(action.payload));
+            })
+            .addCase(getRideDetails.rejected, (state, action) => {
                 state.isLoading = false;
                 state.isError = true;
                 state.message = action.payload;

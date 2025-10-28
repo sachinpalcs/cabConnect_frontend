@@ -2,7 +2,7 @@ import api from "../config/api";
 
 const API_URL = '/drivers/';
 
-// --- NEW: Function to get pending ride requests ---
+// Function to get pending ride requests
 const getPendingRequests = async () => {
     const response = await api.get(API_URL + 'pending-requests');
     return response.data;
@@ -63,6 +63,12 @@ const updateLocation = async (locationData) => {
     return response.data;
 };
 
+// get ride details by id
+const getRideDetails = async (rideId) => {
+    const response = await api.get(API_URL + `getRideDetails/${rideId}`);
+    return response.data;
+};
+
 
 const DriverService = {
     getPendingRequests,
@@ -75,6 +81,7 @@ const DriverService = {
     getAllMyRides,
     updateAvailability,
     updateLocation,
+    getRideDetails,
 };
 
 export default DriverService;

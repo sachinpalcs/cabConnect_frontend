@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { startRide, endRide, cancelRide } from '../redux/DriverSlice';
+import { startRide, endRide, cancelRide, getRideDetails, reset } from '../redux/DriverSlice';
 import GeoLocationName from '../component/map/GeoLocationName';
 
 const DriverAfterAccept = () => {
@@ -10,6 +10,35 @@ const DriverAfterAccept = () => {
     const { activeRide, isLoading, isError, message } = useSelector((state) => state.drivers);
 
     const [otp, setOtp] = useState('');
+
+
+    useEffect(() => {
+        if (activeRide?.id && activeRide?.rideStatues === "CONFIRMED") {
+            dispatch(getRideDetails(activeRide.id));
+
+            const intervalId = setInterval(() => {
+                dispatch(getRideDetails(activeRide.id));
+            }, 3000);
+
+            return () => clearInterval(intervalId);
+        }
+    }, [dispatch, activeRide?.id, activeRide?.rideStatues]);
+
+    useEffect(() => {
+        let timerId = null;
+        if (activeRide?.rideStatues === 'CANCELLED') {
+            timerId = setTimeout(() => {
+                navigate('/driver/dashboard');
+                dispatch(reset());
+            }, 5000);
+        }
+        return () => {
+            if (timerId) {
+                clearTimeout(timerId);
+            }
+        };
+    }, [activeRide?.rideStatues]);
+
 
     const handleStartRide = (e) => {
         e.preventDefault();
@@ -30,6 +59,8 @@ const DriverAfterAccept = () => {
         }
     };
 
+    
+    
     if (!activeRide) {
         return (
             <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-5 flex items-center justify-center">
@@ -44,13 +75,33 @@ const DriverAfterAccept = () => {
                     <button 
                         onClick={() => navigate('/driver/dashboard')}
                         className="w-full py-3 px-6 font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition duration-200 shadow-md hover:shadow-lg"
-                    >
+                    >    
                         Go to Dashboard
                     </button>
                 </div>
             </div>
         );
     }
+
+    if (activeRide.rideStatues === 'CANCELLED') {
+        return (
+            <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-5 flex items-center justify-center">
+                <div className="bg-white p-8 rounded-xl shadow-lg max-w-md w-full text-center">
+                    <div className="mb-6">
+                        {/* Cancel Icon */}
+                        <svg className="w-20 h-20 mx-auto text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </div>
+                    <h2 className="text-2xl font-bold text-gray-800 mb-3">Ride Cancelled</h2>
+                    <p className="text-gray-600 mb-6">This ride has been cancelled. Redirecting to dashboard...</p>
+                    {/* Loading Spinner */}
+                    <div className="w-8 h-8 mx-auto border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                </div>
+            </div>
+        );
+    }
+    
 
     return (
         <div className="min-h-screen bg-gray-100 p-5">
