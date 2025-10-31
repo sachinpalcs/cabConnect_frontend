@@ -78,13 +78,13 @@ const Header = () => {
                     )}
 
                     <NavLink
-                        to="/about"
+                        to="/about-us"
                         className={({ isActive }) =>
                             `px-2 py-1 rounded transition duration-200 ${isActive ? "underline underline-offset-4" : "hover:bg-gray-700"
                             }`
                         }
                     >
-                        About
+                        About Us
                     </NavLink>
                     <NavLink
                         to="/contact-us"
